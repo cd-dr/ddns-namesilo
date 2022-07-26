@@ -15,16 +15,13 @@ except ModuleNotFoundError:
     exit(1)
 
 # https://www.namesilo.com/account_api.php
-NAMESILO_KEY = "YOUR_NAMESILO_API_KEY"
-HOST = "HOSTNAME"
-DOMAIN = "YOUR.DOMAIN"
+NAMESILO_KEY = ""
 TTL = 3600
 
 # https://ifttt.com/maker_webhooks
 IFTTT_EVENT = "YOUR_IFTTT_EVENT_NAME"
-IFTTT_KEY = "YOUR_IFTTT_WEBHOOKS_API_KEY"
+IFTTT_KEY = ""
 
-FULL_HOST = "{0}.{1}".format(HOST, DOMAIN) if HOST != "" else DOMAIN
 BASE_URL = "https://www.namesilo.com/api/"
 log_message = []
 
@@ -34,7 +31,7 @@ dnsListRecords = {
         "version": "1",
         "type": "xml",
         "key": NAMESILO_KEY,
-        "domain": DOMAIN
+        "domain": None
     }
 }
 
@@ -44,8 +41,8 @@ dnsUpdateRecord = {
         "version": "1",
         "type": "xml",
         "key": NAMESILO_KEY,
-        "domain": DOMAIN,
-        "rrhost": HOST,
+        "domain": None,
+        "rrhost": None,
         "rrttl": TTL,
         "rrid": None,
         "rrvalue": None
@@ -58,9 +55,9 @@ dnsAddRecord = {
         "version": "1",
         "type": "xml",
         "key": NAMESILO_KEY,
-        "domain": DOMAIN,
+        "domain": None,
         "rrtype": "A",
-        "rrhost": HOST,
+        "rrhost": None,
         "rrttl": TTL,
         "rrvalue": None
     }
@@ -165,43 +162,47 @@ def get_current_ip():
         raise ValueError(error)
 
 
-def query_and_update():
+def query_and_update(hosts, domain):
     current_ip = get_current_ip()
     log("Current IP={0}".format(current_ip))
-    obj = do_request(dnsListRecords)
-    a_record = None
-    for rec in obj["reply"].resource_record:
-        host = rec.host
-        if rec.type == "A" and FULL_HOST == host:
-            a_record = rec
-            break
-    if a_record is None:
-        log("No A record found for host: '{0}', creating a new A record.".format(FULL_HOST))
-        operation = dnsAddRecord.copy()
-        operation["params"]["rrvalue"] = current_ip
-        do_request(operation)
-        log("new A record added.")
-        log("NEW: type={0}, host={1}, value={2}".format("A", FULL_HOST, current_ip))
-        return
-    record_ip = a_record.value
-    if current_ip != record_ip:
-        log("DDNS need to be updated.")
-        log("OLD: type={0}, host={1}, value={2}".format(a_record.type, a_record.host, a_record.value))
-        operation = dnsUpdateRecord.copy()
-        operation["params"]["rrid"] = a_record.record_id
-        operation["params"]["rrvalue"] = current_ip
-        do_request(operation)
-        log("NEW: type={0}, host={1}, value={2}".format(a_record.type, a_record.host, current_ip))
-    else:
-        log("DDNS is up to date.")
-        log("CUR: type={0}, host={1}, value={2}".format(a_record.type, a_record.host, a_record.value))
+    operation = dnsListRecords.copy()
+    operation["params"]["domain"] = domain
+    obj = do_request(operation)
+    for host in hosts:
+        a_record = None
+        operation = None
+        full_host = "{0}.{1}".format(host, domain) if host != "" else domain
+        for rec in obj["reply"].resource_record:
+            if rec.type == "A" and full_host == rec.host:
+                a_record = rec
+                break
+        if a_record is None:
+            log("No A record found for host: '{0}', creating a new A record.".format(full_host))
+            operation = dnsAddRecord.copy()
+            log("NEW: type={0}, host={1}, value={2}".format("A", full_host, current_ip))
+        else:
+            if current_ip != a_record.value:
+                log("DDNS need to be updated.")
+                operation = dnsUpdateRecord.copy()
+                operation["params"]["rrid"] = a_record.record_id
+                log("UPDATE: type={0}, host={1}, value={2}, old={3}".format(a_record.type, a_record.host, current_ip, a_record.value))
+            else:
+                log("DDNS is up to date.")
+                log("CUR: type={0}, host={1}, value={2}".format(a_record.type, a_record.host, a_record.value))
+        if operation != None:
+            operation["params"]["rrvalue"] = current_ip
+            operation["params"]["rrhost"] = host
+            operation["params"]["domain"] = domain
+            do_request(operation)
 
 
 def main():
     log_message.append("-" * 40)
-    log("Init DDNS for host: '{0}'".format("{0}.{1}".format(HOST, DOMAIN) if HOST != "" else DOMAIN))
+    # log("Init DDNS for host: '{0}'".format("{0}.{1}".format(HOST, DOMAIN) if HOST != "" else DOMAIN))
     try:
-        query_and_update()
+        hs = ["", "www"]
+        dom = "domain.com"
+        query_and_update(hs, dom)
     except FailedPostException as request_failed:
         failed("Failed to do a request with message: '{0}'".format(request_failed.detail))
     except ValueError as get_ip_failed:
