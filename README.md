@@ -1,10 +1,10 @@
-NamesiloDDNS
-==============
+DNS record updater for namesilo
+===============================
 
-Create your own DDNS service with Namesilo.
+Can be used to update multiple DNS records for various hostnames for one domain in your Namesilo account using Namesilo APIs and your API key.
 
-The ddns.py will allow you to update an existing DNS record in your Namesilo account using the Namesilo API and your API key.
+Change the following in `ddns.py`
+- Update *NAMESILO_KEY* to your API key (can be found at https://www.namesilo.com/account_api.php).
+- Change the *hs* variable inside the *main* function to reflect your list of hostnames. Also the *dom* field to your particular domain of interest.
 
-Update the Python file with your own details and host online. Call the file with any task scheduler to regularly update your DDNS entry.
-
-You can get API key from: https://www.namesilo.com/account_api.php
+Call the file with any task scheduler to periodically update your DDNS entries.
